@@ -548,6 +548,17 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
         <span>Vue d'ensemble</span>
       </button>
+      
+      <!-- DOWNLOAD BUTTONS -->
+      <button class="btn" id="btn-download-png" onclick="downloadPng()" title="Télécharger en PNG (Image HD)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>PNG</span>
+      </button>
+      <button class="btn" id="btn-download-svg" onclick="downloadSvg()" title="Télécharger en SVG (Vecteur)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>SVG</span>
+      </button>
+
       <button class="btn" id="btn-theme" onclick="toggleTheme()" title="Changer le thème">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       </button>
@@ -918,6 +929,86 @@
       if (viewMode === 'grid') {
         renderGridView();
       }
+    }
+
+    // DOWNLOAD CURRENT SIGNAL AS SVG
+    function downloadSvg() {
+      const theme = themes[currentIndex];
+      let svgMarkup = getSvgHtml(theme.label, arrowDirection);
+      
+      // Inject Google font stylesheet so it displays correctly when downloaded
+      const styleInject = `<defs><style>@import url('https://fonts.googleapis.com/css2?family=Lilita+One&amp;display=swap');</style></defs>`;
+      svgMarkup = svgMarkup.replace('<svg ', `<svg xmlns="http://www.w3.org/2000/svg" `);
+      svgMarkup = svgMarkup.replace('>', `>${styleInject}`);
+      
+      const blob = new Blob([svgMarkup], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Format filename nicely
+      const cleanLabel = theme.label.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      link.download = `panneau-${cleanLabel}-${arrowDirection}.svg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+
+    // DOWNLOAD CURRENT SIGNAL AS PNG (High Resolution)
+    function downloadPng() {
+      const theme = themes[currentIndex];
+      const svgElement = document.getElementById('card-body-content').querySelector('svg');
+      if (!svgElement) return;
+      
+      // Clone and modify SVG to add namespaces and styles
+      const clonedSvg = svgElement.cloneNode(true);
+      clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      
+      // Add font stylesheet to cloned SVG for canvas rendering
+      const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+      style.textContent = "@import url('https://fonts.googleapis.com/css2?family=Lilita+One&display=swap');";
+      clonedSvg.insertBefore(style, clonedSvg.firstChild);
+      
+      const svgString = new XMLSerializer().serializeToString(clonedSvg);
+      const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+      const blobURL = URL.createObjectURL(svgBlob);
+      
+      const image = new Image();
+      image.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 2000; // 2K HD print quality
+        canvas.height = 880;
+        const context = canvas.getContext('2d');
+        
+        // Solid white background for printing
+        context.fillStyle = '#FFFFFF';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        
+        try {
+          const pngURL = canvas.toDataURL('image/png');
+          const link = document.createElement('a');
+          link.href = pngURL;
+          const cleanLabel = theme.label.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+          link.download = `panneau-${cleanLabel}-${arrowDirection}.png`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        } catch (e) {
+          console.error("Canvas export failed:", e);
+        } finally {
+          URL.revokeObjectURL(blobURL);
+        }
+      };
+      
+      image.onerror = (err) => {
+        console.error("Image loading failed:", err);
+        URL.revokeObjectURL(blobURL);
+      };
+      
+      image.src = blobURL;
     }
 
     // HANDLE KEYBOARD SHORTCUTS
