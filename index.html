@@ -10,6 +10,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Lilita+One&family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
+  
+  <!-- Import jsPDF for client-side multi-page PDF generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
   <style>
     /* CSS DESIGN SYSTEM & TOKENS */
@@ -247,6 +250,97 @@
 
     .nav-item.active .nav-item-num {
       color: var(--accent);
+    }
+
+    /* SIDEBAR FOOTER & ACTIONS */
+    .sidebar-footer {
+      padding: 1rem;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 0.5rem;
+      background-color: rgba(0, 0, 0, 0.15);
+      transition: background-color var(--transition-speed);
+    }
+
+    [data-theme="light"] .sidebar-footer {
+      background-color: rgba(0, 0, 0, 0.02);
+    }
+
+    #input-new-sign {
+      flex: 1;
+      background-color: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 0.6rem 0.8rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-family: var(--font-primary);
+      transition: all var(--transition-speed) ease;
+    }
+
+    [data-theme="light"] #input-new-sign {
+      background-color: rgba(0, 0, 0, 0.03);
+      color: #0E1017;
+    }
+
+    #input-new-sign:focus {
+      outline: none;
+      border-color: var(--accent);
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+
+    .btn-add-sign {
+      background-color: var(--accent);
+      color: #000000;
+      border: none;
+      width: 36px;
+      height: 36px;
+      border-radius: 6px;
+      font-size: 1.3rem;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: all 0.2s ease;
+    }
+
+    [data-theme="light"] .btn-add-sign {
+      color: #FFFFFF;
+    }
+
+    .btn-add-sign:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 12px rgba(var(--accent-rgb), 0.3);
+    }
+
+    .btn-delete-item {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 0.25rem;
+      border-radius: 4px;
+      opacity: 0;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .nav-item:hover .btn-delete-item {
+      opacity: 1;
+    }
+
+    .btn-delete-item:hover {
+      color: #EF4444 !important;
+      background-color: rgba(239, 68, 68, 0.1);
+    }
+
+    /* SPIN ANIMATION */
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
     }
 
     /* CONTENT VIEW AREA */
@@ -517,6 +611,12 @@
 </head>
 <body>
 
+  <!-- Loading overlay for PDF generation -->
+  <div id="pdf-loading-overlay" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.85); z-index:9999; justify-content:center; align-items:center; flex-direction:column; gap:1.5rem; backdrop-filter:blur(5px); color:#FFF; font-family:var(--font-primary);">
+    <div style="width:50px; height:50px; border:4px solid var(--accent); border-top-color:transparent; border-radius:50%; animation:spin 1s linear infinite;"></div>
+    <div id="pdf-loading-text" style="font-weight:600; letter-spacing:1px;">GÉNÉRATION DU PDF...</div>
+  </div>
+
   <!-- APP HEADER -->
   <header class="app-header">
     <div class="brand-logo">
@@ -558,6 +658,10 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         <span>SVG</span>
       </button>
+      <button class="btn" id="btn-download-pdf" onclick="downloadAllPdf()" title="Télécharger tous les panneaux en PDF">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        <span>PDF Complet</span>
+      </button>
 
       <button class="btn" id="btn-theme" onclick="toggleTheme()" title="Changer le thème">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
@@ -576,6 +680,10 @@
       <ul class="nav-list" id="nav-list">
         <!-- Rendered dynamically by JS -->
       </ul>
+      <div class="sidebar-footer">
+        <input type="text" id="input-new-sign" placeholder="Nouveau panneau..." maxlength="30">
+        <button class="btn-add-sign" onclick="addNewSign()" title="Ajouter un nouveau panneau">+</button>
+      </div>
     </aside>
 
     <!-- CONTENT DISPLAY AREA -->
@@ -625,7 +733,7 @@
 
   <script>
     // SIGNAGE CONFIGURATION WITH DEDICATED LIGHT & DARK MODE ACCENTS FOR THE UI
-    const themes = [
+    const defaultThemes = [
       { label: "Tatoueurs", color: "#B026FF", colorLight: "#8B00E8" },
       { label: "Tatouages éphémères", color: "#FF007F", colorLight: "#E6006F" },
       { label: "Maquillage", color: "#FF5E7E", colorLight: "#D93658" },
@@ -637,6 +745,11 @@
       { label: "Restauration", color: "#EF4444", colorLight: "#C22525" },
       { label: "Rollers", color: "#04AA72", colorLight: "#04AA72" }
     ];
+    let themes = JSON.parse(localStorage.getItem('festival_signage_themes')) || defaultThemes;
+
+    function saveThemes() {
+      localStorage.setItem('festival_signage_themes', JSON.stringify(themes));
+    }
 
     // SVG GEOMETRY CONFIGURATION BY DIRECTION (compensated for thick stroke-width="24")
     const arrowGeometry = {
@@ -742,28 +855,62 @@
       
       // Event Listeners for Keyboard
       document.addEventListener('keydown', handleKeyDown);
+      
+      // Input enter listener
+      document.getElementById('input-new-sign').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          addNewSign();
+        }
+      });
     }
 
     // RENDER THE SIDEBAR LIST ITEMS
     function renderSidebar() {
       navList.innerHTML = '';
+      
+      // Update count in header
+      document.querySelector('.sidebar-header h2').textContent = `Signalétiques (${themes.length})`;
+      
       themes.forEach((theme, index) => {
         const li = document.createElement('li');
         li.className = `nav-item ${index === currentIndex ? 'active' : ''}`;
         li.setAttribute('onclick', `selectSlide(${index})`);
-        
-        // Dynamically style each nav item with a preview border color
         li.style.setProperty('--nav-accent', theme.color);
+        
+        const labelWrapper = document.createElement('div');
+        labelWrapper.style.display = 'flex';
+        labelWrapper.style.alignItems = 'center';
+        labelWrapper.style.gap = '0.5rem';
+        labelWrapper.style.overflow = 'hidden';
+        
+        // Delete button
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'btn-delete-item';
+        deleteBtn.title = "Supprimer ce panneau";
+        deleteBtn.innerHTML = `
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+        `;
+        deleteBtn.onclick = (e) => deleteSign(e, index);
         
         const textSpan = document.createElement('span');
         textSpan.className = 'nav-item-text';
         textSpan.textContent = theme.label;
+        textSpan.style.textOverflow = 'ellipsis';
+        textSpan.style.whiteSpace = 'nowrap';
+        textSpan.style.overflow = 'hidden';
 
+        labelWrapper.appendChild(deleteBtn);
+        labelWrapper.appendChild(textSpan);
+ 
         const numSpan = document.createElement('span');
         numSpan.className = 'nav-item-num';
         numSpan.textContent = `W${(index + 1).toString().padStart(2, '0')}`;
+        numSpan.style.flexShrink = '0';
 
-        li.appendChild(textSpan);
+        li.appendChild(labelWrapper);
         li.appendChild(numSpan);
         navList.appendChild(li);
       });
@@ -928,6 +1075,149 @@
       // Refresh grid view colors if active
       if (viewMode === 'grid') {
         renderGridView();
+      }
+    }
+
+    // ADD A NEW SIGN
+    function addNewSign() {
+      const input = document.getElementById('input-new-sign');
+      const value = input.value.trim();
+      if (!value) return;
+      
+      const presetColors = [
+        "#B026FF", "#FF007F", "#FF5E7E", "#FF6B00", "#2CD40E",
+        "#E6C200", "#00B4D8", "#3B82F6", "#EF4444", "#04AA72",
+        "#EC4899", "#8B5CF6", "#10B981", "#F59E0B", "#F43F5E"
+      ];
+      const color = presetColors[themes.length % presetColors.length];
+      
+      const newTheme = {
+        label: value,
+        color: color,
+        colorLight: color
+      };
+      
+      themes.push(newTheme);
+      saveThemes();
+      
+      renderSidebar();
+      renderGridView();
+      updateCard(themes.length - 1);
+      input.value = '';
+    }
+
+    // DELETE A SIGN
+    function deleteSign(event, index) {
+      event.stopPropagation();
+      
+      if (themes.length <= 1) {
+        alert("Il doit rester au moins un panneau.");
+        return;
+      }
+      
+      if (!confirm(`Supprimer le panneau "${themes[index].label}" ?`)) {
+        return;
+      }
+      
+      themes.splice(index, 1);
+      saveThemes();
+      
+      if (currentIndex >= themes.length) {
+        currentIndex = themes.length - 1;
+      }
+      
+      renderSidebar();
+      renderGridView();
+      updateCard(currentIndex);
+    }
+
+    // Helper to render one SVG to canvas and return its data URL
+    function renderSvgToCanvas(label, direction) {
+      return new Promise((resolve, reject) => {
+        const div = document.createElement('div');
+        div.innerHTML = getSvgHtml(label, direction);
+        const svgElement = div.querySelector('svg');
+        
+        const clonedSvg = svgElement.cloneNode(true);
+        clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+        
+        const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+        style.textContent = "@import url('https://fonts.googleapis.com/css2?family=Lilita+One&display=swap');";
+        clonedSvg.insertBefore(style, clonedSvg.firstChild);
+        
+        const svgString = new XMLSerializer().serializeToString(clonedSvg);
+        const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+        const blobURL = URL.createObjectURL(svgBlob);
+        
+        const image = new Image();
+        image.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = 2000;
+          canvas.height = 880;
+          const context = canvas.getContext('2d');
+          
+          context.fillStyle = '#FFFFFF';
+          context.fillRect(0, 0, canvas.width, canvas.height);
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          
+          try {
+            const pngURL = canvas.toDataURL('image/png');
+            URL.revokeObjectURL(blobURL);
+            resolve(pngURL);
+          } catch (err) {
+            URL.revokeObjectURL(blobURL);
+            reject(err);
+          }
+        };
+        image.onerror = (err) => {
+          URL.revokeObjectURL(blobURL);
+          reject(err);
+        };
+        image.src = blobURL;
+      });
+    }
+
+    // GENERATE AND DOWNLOAD PDF WITH ALL SIGNS
+    async function downloadAllPdf() {
+      const overlay = document.getElementById('pdf-loading-overlay');
+      const text = document.getElementById('pdf-loading-text');
+      overlay.style.display = 'flex';
+      
+      try {
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({
+          orientation: 'landscape',
+          unit: 'pt',
+          format: 'a4'
+        });
+        
+        const pdfWidth = 842;
+        const pdfHeight = 595;
+        const signWidth = 780;
+        const signHeight = (signWidth * 880) / 2000; // ~343 pt
+        const x = (pdfWidth - signWidth) / 2;
+        const y = (pdfHeight - signHeight) / 2;
+        
+        for (let i = 0; i < themes.length; i++) {
+          text.textContent = `GÉNÉRATION DU PDF : PANNEAU ${i + 1} / ${themes.length}...`;
+          
+          const theme = themes[i];
+          const dataUrl = await renderSvgToCanvas(theme.label, arrowDirection);
+          
+          if (i > 0) {
+            pdf.addPage('a4', 'landscape');
+          }
+          
+          pdf.addImage(dataUrl, 'PNG', x, y, signWidth, signHeight);
+        }
+        
+        text.textContent = "SAUVEGARDE DU PDF...";
+        pdf.save(`signaletique-complete-${arrowDirection}.pdf`);
+      } catch (err) {
+        console.error("PDF generation failed:", err);
+        alert("Erreur lors de la génération du PDF. Consultez la console pour plus de détails.");
+      } finally {
+        overlay.style.display = 'none';
       }
     }
 
